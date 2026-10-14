@@ -16,6 +16,10 @@ Application Spring Boot minimale qui répond `Hello World` sur `GET /`, déploy�
 │   ├── HelloApplication.java
 │   └── HelloController.java        # GET / -> "Hello World"
 ├── src/main/resources/application.properties
+├── k8s/
+│   ├── deployment.yaml             # Deployment : image, probes, ressources, trigger d'image
+│   ├── service.yaml                # Service sur le port 8080
+│   └── route.yaml                  # Route HTTPS (edge)
 └── docs/deploiement-openshift.md   # toutes les commandes
 ```
 
@@ -27,8 +31,7 @@ Prérequis : la CLI `oc` installée et une session ouverte sur le cluster (`oc l
 oc new-project hello
 oc new-build --binary --strategy=docker --name=hello-world
 oc start-build hello-world --from-dir=. --follow
-oc new-app hello-world
-oc create route edge hello-world --service=hello-world --port=8080
+oc apply -f k8s/
 
 curl https://$(oc get route hello-world -o jsonpath='{.spec.host}')
 # Hello World

@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: hello-world
+  labels:
+    app: hello-world
+spec:
+  # Pas de "host" : OpenShift génère hello-world-<projet>.apps.<domaine-du-cluster>
+  to:
+    kind: Service
+    name: hello-world
+  port:
+    targetPort: http
+  tls:
+    # HTTPS terminé sur le routeur, HTTP vers le pod ; HTTP redirigé vers HTTPS
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

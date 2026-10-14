@@ -4,3 +4,4 @@ target/
 .vscode/
 docs/
 *.md
+k8s/

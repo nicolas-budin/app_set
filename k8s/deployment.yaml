@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world
+  labels:
+    app: hello-world
+  annotations:
+    # Redéploie automatiquement à chaque nouvelle image poussée dans l'ImageStream hello-world:latest
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"hello-world:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"hello-world\")].image"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-world
+  template:
+    metadata:
+      labels:
+        app: hello-world
+    spec:
+      containers:
+        - name: hello-world
+          # Image du registre interne : <registre>/<projet>/<imagestream>:<tag>
+          image: image-registry.openshift-image-registry.svc:5000/hello/hello-world:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          # Compatible avec la SCC restricted-v2 (UID aléatoire attribué par OpenShift)
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
