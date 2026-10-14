@@ -31,7 +31,7 @@ Avec Maven et Java 21 :
 ```bash
 mvn test                  # tests unitaires
 mvn spring-boot:run
-curl localhost:8080       # Hello World !!! (local)
+curl localhost:8080       # Hello World !!! (local) - Message secret : aucun
 ```
 
 Avec Docker ou Podman (même image que celle construite par OpenShift) :
@@ -79,6 +79,7 @@ Le dossier `k8s/` décrit l'application de façon déclarative :
 | `k8s/deployment.yaml` | **Deployment** `hello-world` : image, port 8080, health checks, ressources, sécurité. L'annotation `image.openshift.io/triggers` le redéploie à chaque nouvelle image de l'ImageStream. |
 | `k8s/service.yaml` | **Service** `hello-world` sur le port 8080 |
 | `k8s/route.yaml` | **Route** `hello-world` en HTTPS (edge) ; le HTTP est redirigé vers HTTPS |
+| `k8s/secret.yaml` | **Secret** `hello-world-secret` : message affiché par l'appli, injecté dans la variable `SECRET_MESSAGE` |
 
 L'image est référencée par `image-registry.openshift-image-registry.svc:5000/hello/hello-world:latest`. Si ton projet ne s'appelle pas `hello`, remplace `hello` dans `k8s/deployment.yaml`.
 
@@ -116,7 +117,8 @@ Les health checks ne sont pas configurés par `oc new-app` : voir la section 8.
 
 ```bash
 HOST=$(oc get route hello-world -o jsonpath='{.spec.host}')
-curl https://$HOST                         # Hello World !!! (local)
+curl https://$HOST                         # Hello World !!! (local) - Message secret : Bonjour depuis le projet hello
+                                           # (avec oc new-app, section 6 : « Message secret : aucun »)
 curl https://$HOST/actuator/health         # {"status":"UP",...}
 ```
 
@@ -165,6 +167,24 @@ oc set resources deploy/hello-world \
   --requests=cpu=100m,memory=256Mi --limits=memory=512Mi     # ressources
 oc rsh deploy/hello-world                        # shell dans un pod
 oc get all -l app=hello-world                    # toutes les ressources de l'appli
+```
+
+### Message secret
+
+L'appli affiche le message du Secret `hello-world-secret`, défini dans `k8s/secret.yaml`.
+
+> ⚠️ Le dépôt GitHub est public : ce message est lisible par tous. Un Secret est seulement encodé en base64, pas chiffré. Ne jamais y mettre un vrai mot de passe.
+
+```bash
+oc extract secret/hello-world-secret --to=-                    # lire le message décodé
+oc exec deploy/hello-world -- printenv SECRET_MESSAGE          # ce que voit l'appli
+```
+
+Pour changer le message, modifier `k8s/secret.yaml`, puis lancer les commandes ci-dessous. Le redémarrage est nécessaire : la variable d'environnement n'est lue qu'au démarrage du pod.
+
+```bash
+oc apply -f k8s/secret.yaml
+oc rollout restart deploy/hello-world
 ```
 
 Avec les fichiers YAML, `oc scale`, `oc set env` et `oc set resources` modifient le cluster mais pas les fichiers : le prochain `oc apply -f k8s/` annule ces changements. Pour les garder, reporte-les dans `k8s/deployment.yaml`.

@@ -19,6 +19,6 @@ class HelloControllerTest {
     void returnsHelloWorld() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string("Hello World !!! (local)"));
+                .andExpect(content().string("Hello World !!! (local) - Message secret : aucun"));
     }
 }

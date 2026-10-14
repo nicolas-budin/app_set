@@ -22,6 +22,12 @@ spec:
         - name: hello-world
           # Image du registre interne : <registre>/<projet>/<imagestream>:<tag>
           image: image-registry.openshift-image-registry.svc:5000/hello/hello-world:latest
+          env:
+            - name: SECRET_MESSAGE
+              valueFrom:
+                secretKeyRef:
+                  name: hello-world-secret
+                  key: message
           ports:
             - name: http
               containerPort: 8080

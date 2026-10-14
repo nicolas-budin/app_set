@@ -4,7 +4,7 @@ Ce guide déploie l'application `hello-world` dans 3 environnements sur OpenShif
 
 Pour le déploiement manuel dans un seul projet, sans ArgoCD, voir [deploiement-openshift.md](deploiement-openshift.md).
 
-Pour la liste complète des commandes avec l'explication de chacune, voir la **section 15**, en fin de document.
+Pour la liste complète des commandes avec l'explication de chacune, voir la **section 16**, en fin de document.
 
 ## 1. Principe
 
@@ -27,9 +27,9 @@ Pour la liste complète des commandes avec l'explication de chacune, voir la **s
 
 | Dossier / fichier | Rôle |
 | --- | --- |
-| `charts/hello-world/` | Chart Helm : Deployment, Service et Route communs aux 3 environnements |
+| `charts/hello-world/` | Chart Helm : Deployment, Service, Route et Secret communs aux 3 environnements |
 | `charts/hello-world/values.yaml` | Valeurs par défaut |
-| `envs/dev/values.yaml`, `envs/int/values.yaml`, `envs/prd/values.yaml` | Ce qui change par environnement : `env`, `replicas`, `image.tag` |
+| `envs/dev/values.yaml`, `envs/int/values.yaml`, `envs/prd/values.yaml` | Ce qui change par environnement : `env`, `replicas`, `image.tag`, `secretMessage` |
 | `argocd/applicationset.yaml` | L'ApplicationSet, qui génère `hello-world-dev`, `hello-world-int` et `hello-world-prd` |
 
 | Environnement | Application ArgoCD | Namespace | Replicas |
@@ -147,9 +147,9 @@ for env in dev int prd; do
   HOST=$(oc get route hello-world -n hello-$env -o jsonpath='{.spec.host}')
   echo "$env -> $(curl -s https://$HOST)"
 done
-# dev -> Hello World !!! (DEV)
-# int -> Hello World !!! (INT)
-# prd -> Hello World !!! (PRD)
+# dev -> Hello World !!! (DEV) - Message secret : Bonjour depuis DEV
+# int -> Hello World !!! (INT) - Message secret : Bonjour depuis INT
+# prd -> Hello World !!! (PRD) - Message secret : Bonjour depuis PRD
 ```
 
 Si le certificat du cluster est auto-signé, ajouter `-k` à `curl`.
@@ -207,7 +207,64 @@ git add envs/rec && git commit -m "Ajout de l'environnement REC" && git push
 
 L'ApplicationSet détecte le nouveau dossier et crée l'Application `hello-world-rec` toute seule.
 
-## 12. Exploiter
+## 12. Message secret
+
+L'appli affiche un message stocké dans un **Secret** Kubernetes, différent pour chaque environnement.
+
+> ⚠️ **Le dépôt GitHub est public.** Un Secret Kubernetes est seulement **encodé** en base64, pas chiffré. Ici, le message est en plus écrit en clair dans `envs/<env>/values.yaml`. **Tout le monde peut le lire sur GitHub.** Ce fonctionnement convient pour une démo, mais **jamais pour un vrai mot de passe, token ou clé**. Pour de vraies données sensibles, voir « Aller plus loin » ci-dessous.
+
+### Fonctionnement
+
+```text
+envs/dev/values.yaml          secretMessage: "Bonjour depuis DEV"
+        │  Helm (templates/secret.yaml)
+        ▼
+Secret hello-world-secret     data.message: Qm9uam91ciBkZXB1aXMgREVW   (base64)
+        │  Deployment : env SECRET_MESSAGE <- secretKeyRef
+        ▼
+Variable d'environnement      SECRET_MESSAGE=Bonjour depuis DEV
+        │  @Value("${SECRET_MESSAGE}") dans HelloController
+        ▼
+Page                          Hello World !!! (DEV) - Message secret : Bonjour depuis DEV
+```
+
+| Fichier | Rôle |
+| --- | --- |
+| `charts/hello-world/templates/secret.yaml` | Crée le Secret `hello-world-secret`. `stringData` permet d'écrire la valeur en clair : Kubernetes l'encode lui-même en base64. |
+| `charts/hello-world/templates/deployment.yaml` | Injecte la clé `message` du Secret dans la variable `SECRET_MESSAGE` (`valueFrom.secretKeyRef`). L'annotation `checksum/secret` redémarre les pods quand le Secret change. |
+| `envs/<env>/values.yaml` | La valeur `secretMessage` propre à l'environnement |
+
+### Modifier le message
+
+1. Changer `secretMessage` dans `envs/dev/values.yaml`.
+2. Faire un commit et un push :
+
+   ```bash
+   git commit -am "DEV : nouveau message secret" && git push
+   ```
+
+ArgoCD met à jour le Secret. Une variable d'environnement n'est lue qu'au démarrage d'un pod : sans mécanisme particulier, les pods continueraient d'afficher l'ancien message. Ici, l'annotation `checksum/secret` du Deployment est une empreinte du Secret. Quand le message change, l'empreinte change aussi, ce qui déclenche un **rolling update** automatique.
+
+### Lire le secret dans le cluster
+
+```bash
+oc get secret hello-world-secret -n hello-dev                                          # le Secret existe
+oc get secret hello-world-secret -n hello-dev -o jsonpath='{.data.message}' | base64 -d; echo   # valeur décodée
+oc extract secret/hello-world-secret -n hello-dev --to=-                               # toutes les clés, décodées
+oc exec deploy/hello-world -n hello-dev -- printenv SECRET_MESSAGE                     # ce que voit l'appli
+```
+
+### Aller plus loin : de vrais secrets
+
+Pour une donnée réellement sensible, elle ne doit jamais apparaître en clair dans Git :
+
+| Solution | Principe |
+| --- | --- |
+| **Secret créé à la main** | `oc create secret generic hello-world-secret --from-literal=message=... -n hello-dev`. Le Secret reste hors de Git, et le chart ne fait que le référencer. |
+| **Sealed Secrets** | Le secret est chiffré avec la clé publique du cluster (CLI `kubeseal`). Le fichier chiffré peut être commité, et seul le contrôleur du cluster peut le déchiffrer. |
+| **External Secrets Operator** | Le secret est stocké dans un coffre (HashiCorp Vault, AWS Secrets Manager…). L'opérateur le copie dans un Secret Kubernetes. |
+
+## 13. Exploiter
 
 ```bash
 oc get applications -n openshift-gitops                        # état des 3 environnements
@@ -219,7 +276,7 @@ oc get is hello-world -n hello-build                           # versions d'imag
 
 **`selfHeal` est activé.** Une modification faite à la main dans le cluster (`oc scale`, `oc set env`, `oc edit`…) est annulée par ArgoCD en quelques secondes. Pour changer quelque chose de façon durable, il faut passer par Git.
 
-## 13. Dépanner
+## 14. Dépanner
 
 ```bash
 oc describe applicationset hello-world -n openshift-gitops     # erreurs de génération
@@ -235,9 +292,10 @@ oc logs -n openshift-gitops deploy/openshift-gitops-applicationset-controller
 | `... is forbidden: User "system:serviceaccount:openshift-gitops:..."` | Label `managed-by` absent du namespace | `oc label namespace hello-<env> argocd.argoproj.io/managed-by=openshift-gitops` |
 | `ImagePullBackOff` | Tag de version absent ou droit `image-puller` manquant | `oc get is hello-world -n hello-build` pour voir les tags, puis relancer la commande `oc policy add-role-to-group` de la section 5 |
 | Application `OutOfSync` en permanence | Modification faite à la main, ou champ ajouté par le cluster | Comparer avec le bouton **App Diff** dans la console |
+| Pod en `CreateContainerConfigError` | Le Secret `hello-world-secret` n'existe pas, ou la clé `message` est absente | `oc get secret hello-world-secret -n hello-<env>` et `oc describe pod <pod>` |
 | La nouvelle version n'est pas déployée | Push pas fait, ou ArgoCD pas encore rafraîchi | `git log origin/main`, puis faire un **Refresh** (section 10) |
 
-## 14. Nettoyer
+## 15. Nettoyer
 
 Supprimer l'ApplicationSet supprime aussi les 3 Applications. Grâce au finalizer `resources-finalizer.argocd.argoproj.io`, leurs ressources (Deployment, Service, Route) sont supprimées aussi.
 
@@ -246,7 +304,7 @@ oc delete applicationset hello-world -n openshift-gitops
 oc delete project hello-dev hello-int hello-prd hello-build
 ```
 
-## 15. Récapitulatif : toutes les commandes expliquées
+## 16. Récapitulatif : toutes les commandes expliquées
 
 Les commandes de la mise en place sont listées ici dans l'ordre, chacune avec son explication. Lance-les depuis la racine du projet. Les étapes 0 à 4 ne se font qu'une seule fois. Ensuite, tout passe par Git.
 
@@ -336,7 +394,7 @@ done
 | --- | --- |
 | `oc get applications -n openshift-gitops` | Liste les Applications ArgoCD. Tu dois voir `hello-world-dev`, `hello-world-int` et `hello-world-prd`, avec :<br>• **SYNC** = `Synced` : le cluster correspond à Git ;<br>• **HEALTH** = `Healthy` : les pods tournent et sont prêts. |
 | `oc get route hello-world -n hello-$env -o jsonpath='{.spec.host}'` | Récupère l'adresse publique de la Route dans un namespace. `-o jsonpath` extrait seulement le champ `spec.host`, par exemple `hello-world-hello-dev.apps.mon-cluster.com`. |
-| `curl -s https://<host>` | Appelle l'appli à cette adresse et affiche sa réponse. `-s` masque la barre de progression, `-k` (à ajouter si besoin) ignore un certificat auto-signé. Chaque environnement doit répondre avec son nom : `Hello World !!! (DEV)`… |
+| `curl -s https://<host>` | Appelle l'appli à cette adresse et affiche sa réponse. `-s` masque la barre de progression, `-k` (à ajouter si besoin) ignore un certificat auto-signé. Chaque environnement doit répondre avec son nom et son message secret : `Hello World !!! (DEV) - Message secret : Bonjour depuis DEV`… |
 
 ### Livrer une nouvelle version
 

@@ -13,6 +13,9 @@ spec:
     metadata:
       labels:
         app: hello-world
+      annotations:
+        # Change quand le Secret change : force le redémarrage des pods pour relire SECRET_MESSAGE
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
       containers:
         - name: hello-world
@@ -22,6 +25,11 @@ spec:
           env:
             - name: APP_ENV
               value: {{ .Values.env | quote }}
+            - name: SECRET_MESSAGE
+              valueFrom:
+                secretKeyRef:
+                  name: hello-world-secret
+                  key: message
           ports:
             - name: http
               containerPort: 8080

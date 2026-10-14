@@ -11,8 +11,12 @@ public class HelloController {
     @Value("${APP_ENV:local}")
     private String env;
 
+    // Message lu dans le Secret hello-world-secret, injecté par le Deployment via la variable SECRET_MESSAGE
+    @Value("${SECRET_MESSAGE:aucun}")
+    private String secretMessage;
+
     @GetMapping("/")
     public String hello() {
-        return "Hello World !!! (" + env + ")";
+        return "Hello World !!! (" + env + ") - Message secret : " + secretMessage;
     }
 }

@@ -3,6 +3,9 @@ env: PRD
 
 replicas: 2
 
+# Message stocké dans le Secret hello-world-secret (en clair dans Git : pas de vraie donnée sensible ici)
+secretMessage: "Bonjour depuis PRD"
+
 image:
   # Version déployée : la changer ici (commit + push) pour promouvoir une version validée en INT
   tag: "1.0.0"

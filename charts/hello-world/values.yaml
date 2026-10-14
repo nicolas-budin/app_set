@@ -5,6 +5,10 @@ env: local
 
 replicas: 1
 
+# Message affiché par l'appli, stocké dans le Secret hello-world-secret.
+# ATTENTION : dépôt public, ce message est lisible par tous sur GitHub (démo uniquement)
+secretMessage: "message par défaut"
+
 image:
   # ImageStream hello-world du namespace hello-build (registre interne OpenShift)
   repository: image-registry.openshift-image-registry.svc:5000/hello-build/hello-world
