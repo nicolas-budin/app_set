@@ -5,3 +5,6 @@ target/
 docs/
 *.md
 k8s/
+charts/
+envs/
+argocd/

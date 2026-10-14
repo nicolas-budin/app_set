@@ -31,7 +31,7 @@ Avec Maven et Java 21 :
 ```bash
 mvn test                  # tests unitaires
 mvn spring-boot:run
-curl localhost:8080       # Hello World
+curl localhost:8080       # Hello World !!! (local)
 ```
 
 Avec Docker ou Podman (même image que celle construite par OpenShift) :
@@ -116,7 +116,7 @@ Les health checks ne sont pas configurés par `oc new-app` : voir la section 8.
 
 ```bash
 HOST=$(oc get route hello-world -o jsonpath='{.spec.host}')
-curl https://$HOST                         # Hello World
+curl https://$HOST                         # Hello World !!! (local)
 curl https://$HOST/actuator/health         # {"status":"UP",...}
 ```
 

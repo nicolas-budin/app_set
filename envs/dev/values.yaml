@@ -1,0 +1,8 @@
+# Environnement DEV -> namespace hello-dev
+env: DEV
+
+replicas: 1
+
+image:
+  # Version déployée : la changer ici (commit + push) pour déployer une nouvelle version
+  tag: "1.0.0"

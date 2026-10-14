@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: hello-world
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Un dossier envs/<env> = une Application hello-world-<env> déployée dans le namespace hello-<env>
+    - git:
+        repoURL: https://github.com/nicolas-budin/app_set.git
+        revision: main
+        directories:
+          - path: envs/*
+  template:
+    metadata:
+      name: "hello-world-{{.path.basename}}"
+      labels:
+        app: hello-world
+        env: "{{.path.basename}}"
+      # Supprimer l'Application supprime aussi ses ressources dans le namespace
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/nicolas-budin/app_set.git
+        targetRevision: main
+        path: charts/hello-world
+        helm:
+          valueFiles:
+            - "../../envs/{{.path.basename}}/values.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "hello-{{.path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

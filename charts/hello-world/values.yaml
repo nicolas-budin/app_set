@@ -1,0 +1,18 @@
+# Valeurs par défaut, surchargées par envs/<env>/values.yaml
+
+# Nom de l'environnement, exposé à l'appli via la variable APP_ENV
+env: local
+
+replicas: 1
+
+image:
+  # ImageStream hello-world du namespace hello-build (registre interne OpenShift)
+  repository: image-registry.openshift-image-registry.svc:5000/hello-build/hello-world
+  tag: latest
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

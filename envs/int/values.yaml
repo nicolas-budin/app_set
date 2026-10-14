@@ -1,0 +1,8 @@
+# Environnement INT -> namespace hello-int
+env: INT
+
+replicas: 1
+
+image:
+  # Version déployée : la changer ici (commit + push) pour promouvoir une version validée en DEV
+  tag: "1.0.0"

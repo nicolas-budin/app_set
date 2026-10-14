@@ -1,0 +1,8 @@
+# Environnement PRD -> namespace hello-prd
+env: PRD
+
+replicas: 2
+
+image:
+  # Version déployée : la changer ici (commit + push) pour promouvoir une version validée en INT
+  tag: "1.0.0"
